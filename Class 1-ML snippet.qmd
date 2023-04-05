@@ -1,0 +1,150 @@
+---
+title: "Snippet 1"
+author: "Ernesto Calvo"
+format: html
+editor: visual
+editor_options: 
+  chunk_output_type: console
+---
+
+## Maximum Likelihood by Brute Force
+
+This snippet provides an intuitive example of Maximum Likelihood by creating a matrix of loglik scores.
+
+## Creating the data
+
+We will first create a synthetic dataset that has known parameters:
+
+```{r}
+library("tidyverse")
+library("plot3D")
+
+# Set seed for reproducibility
+set.seed(100)
+
+# Define the sample size
+T <- 1000
+
+# Generate independent variable
+x <- rnorm(T, 0, 1)
+
+# We create a model that has parameters indexed by individual observation
+
+#true_params_global <- list(alpha = 1.4, beta = 2.1, sigma = 1.0)
+true_params <- list(alpha = rnorm(T,1.4), beta = rnorm(T,2.1), sigma = 1.0)
+
+
+# Generate dependent variable
+z <- rnorm(T, mean = true_params$alpha + true_params$beta * x, sd = true_params$sigma)
+
+plot(z,x, cex=.4, pch=16, col="red")
+
+```
+
+Now we will retrieve the design parameters from the data.
+
+First, let's try a brute force approach
+
+```{r}
+
+# Define grid for alpha and beta values
+alpha_grid <- seq(-60, 60, by = 2) / 8
+beta_grid <- seq(-160, 160, by = 4) / 20
+
+# Compute log-likelihoods for each combination of alpha and beta values
+ll_grid <- expand.grid(alpha = alpha_grid, beta = beta_grid) %>%
+  mutate(log_likelihood = map2_dbl(alpha, beta, function(a, b) {
+    sum(dnorm(z, mean = a + b * x, sd = 1, log = TRUE))
+  })) %>%
+  spread(beta, log_likelihood)
+
+View(ll_grid)
+
+```
+
+The `echo: false` option disables the printing of code (only outp![Close document tab](data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABIAAAASCAYAAABWzo5XAAAAWElEQVR42mNgGPTAxsZmJsVqQApgmGw1yApwKcQiT7phRBuCzzCSDSHGMKINIeDNmWQlA2IigKJwIssQkHdINgxfmBBtGDEBS3KCxBc7pMQgMYE5c/AXPwAwSX4lV3pTWwAAAABJRU5ErkJggg==){alt="Close document tab"}ut is displayed).
+
+```{r}
+# Find the optimal alpha and beta values
+optimal_params <- ll_grid %>%
+  gather(beta, log_likelihood, -alpha) %>%
+  top_n(1, log_likelihood) %>%
+  select(alpha, beta)
+
+# Plot the log-likelihood surface
+persp3D(alpha_grid, beta_grid, as.matrix(ll_grid[,-1]),
+        theta = 3, phi = 20, axes = FALSE)
+
+```
+
+Explore the grid to find the set of parameters that maximize the likelihood of observing the data.
+
+```{r}
+max_location <- which(as.matrix(ll_grid[,-1]) == max(as.matrix(ll_grid[,-1])), arr.ind = TRUE)
+print(max_location)
+print(max(ll_grid))
+#Estimate the model
+
+# Define the negative log-likelihood function for a linear model
+myreg <- function(theta, z, x) {
+  sum(-dnorm(z,
+             mean = theta[1] + theta[2] * x,
+             sd = theta[3], log = TRUE))
+}
+
+# Estimate theta using the NLM function
+estimate_theta <- function(z, x, theta_start = c(1, 1, 1), print_level = 2) {
+  out <- nlm(myreg, theta_start, z = z, x = x, print.level = print_level, hessian = TRUE)
+  
+  tibble(
+    MaximumLikelihood = -out$minimum,
+    ParameterEstimates = out$estimate,
+    StandardErrors = sqrt(diag(solve(out$hessian))),
+    tvalues = out$estimate / sqrt(diag(solve(out$hessian))),
+    Ratios = out$estimate / sqrt(diag(solve(out$hessian)))
+  )
+}
+
+# Set initial values for the parameters
+theta.start <- c(1, 1, 1)
+
+# Estimate theta and display the results
+results <- estimate_theta(z, x, theta_start = theta.start)
+print(results)
+
+```
+
+```{r}
+# Load libraries
+library(ggplot2)
+
+# Gather the results into key-value pairs
+results_long <- results %>%
+  select(ParameterEstimates, StandardErrors) %>%
+  gather(key = "Variable", value = "Value")
+
+# Create the ggplot
+ggplot(results_long, aes(x = Variable, y = Value, color = Variable)) +
+  geom_point(size = 3) +
+  theme_minimal() +
+  labs(title = "Parameter Estimates and Standard Errors",
+       x = "Parameter",
+       y = "Value")
+
+
+
+# Calculate the confidence intervals
+alpha <- 0.05 # 95% confidence interval
+results_ci <- results %>%
+  mutate(
+    LowerBound = ParameterEstimates - qt(1 - alpha/2, T - 2) * StandardErrors,
+    UpperBound = ParameterEstimates + qt(1 - alpha/2, T - 2) * StandardErrors
+  ) %>%
+  select(Parameter = ParameterEstimates, LowerBound, UpperBound) %>%
+  gather(key = "Variable", value = "Value", -Parameter) %>%
+  mutate(Variable = factor(Variable, levels = c("LowerBound", "Parameter", "UpperBound")))
+
+plot(results$ParameterEstimates, ylim=c(0.5,2.5), ylab=c("alpha", "beta"))
+segments(1:3,results_ci$Value,1:3, results_ci$Parameter)
+
+```

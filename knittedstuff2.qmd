@@ -1,0 +1,149 @@
+---
+title: "Web Scraping"
+format: 
+  html:
+    toc: true
+    css: styles.css
+    embed-resources: true
+    code-fold: true
+    code-overflow: wrap
+    code-tools: 
+      source: true
+      toggle: true
+execute: 
+  echo: false
+---
+
+
+```{r}
+#| echo: false
+#| include: false
+
+library(tidyr)
+library(tidytext)
+library(tidyverse)
+library(broom)
+library(tm)
+library(devtools)
+library(wordcloud2)
+library(devtools)
+library(rvest)
+
+
+```
+
+```{r}
+
+
+# read_html is from the rvest package
+url1 <- read_html("https://www.virginiamercury.com/2022/11/10/young-black-and-latino-voters-seen-as-key-in-turning-back-midterm-red-wave/") %>%
+  html_elements( "p") %>%
+  html_text()
+
+url2 <- read_html("https://www.nbcnews.com/news/nbcblk/young-black-voters-are-dominating-georgia-midterms-one-student-time-rcna50637") %>%
+  html_elements( "p") %>%
+  html_text()
+
+
+url3 <- read_html("https://www.nbcnews.com/news/nbcblk/young-black-voters-are-dominating-georgia-midterms-one-student-time-rcna50637") %>%
+  html_elements( "p") %>%
+  html_text()
+
+url4 <- read_html("https://circle.tufts.edu/latest-research/young-voters-2022-black-and-non-college-youth-were-underrepresented") %>%
+  html_elements( "p") %>%
+  html_text()
+
+
+# this creates a function 'scraper'
+scraper <- function(url, elements) {
+  read_html(url) %>% #This reads the html of the url provided
+    html_elements(elements) %>% #This selects the specific node you're looking to scrape
+    html_text() %>% #This then scrapes the text from that note
+    enframe("id", "text") #This puts it into a data frame with one column being id (or th
+}
+
+
+
+# this is using the 'scraper' function to scrape text from an article in the NYT
+# This places all the elements into a dataframe, with each individual element placed in rows 
+article1 <- scraper(
+  url = "https://www.virginiamercury.com/2022/11/10/young-black-and-latino-voters-seen-as-key-in-turning-back-midterm-red-wave/",
+  elements = "p")
+
+
+
+# I don't need any of the rows below row 74
+# this simply empties out all the rows identified, replacing them with 'NA'
+article1[75:83,] <- NA
+
+# this function from the dplyr package 'dplyr::drop_na' 
+# drops rows where any column specified by ... contains a missing value
+article1 <- article1 %>% 
+  tidyr::drop_na()
+
+
+```
+
+
+```{r}
+
+# this 'tokenizes' the text
+# which means it separates the paragraphs into sentences and words
+article1_untokenized <- article1 %>% 
+  unnest_tokens(word, text)
+
+
+# This removes the most common 'stop words' from the corpus
+article1_sansstop <- article1_untokenized %>% 
+  anti_join(stop_words,
+            by = join_by(word))
+
+# article1_sansstop %>% 
+#   count(word, sort = TRUE) %>%
+#   View()
+
+# this is a barplot of the top ten most frequent words
+article1_sansstop %>% 
+  count(word, sort = TRUE) %>% 
+  head(n = 10) %>% 
+  ggplot(aes(x = word, y = n))+
+  geom_col()
+
+```
+
+
+```{r}
+
+# this is only for the words that will appear in the word cloud
+article1_words <- article1_sansstop %>% 
+  count(word, sort = TRUE)
+
+
+# This is just to render the word cloud
+wordcloud2(article1_words)
+
+
+```
+
+
+
+## Quarto
+
+Quarto enables you to weave together content and executable code into a finished document. To learn more about Quarto see <https://quarto.org>.
+
+## Running Code
+
+When you click the **Render** button a document will be generated that includes both content and the output of embedded code. You can embed code like this:
+
+```{r}
+1 + 1
+```
+
+You can add options to executable code like this 
+
+```{r}
+#| echo: false
+2 * 2
+```
+
+The `echo: false` option disables the printing of code (only output is displayed).
