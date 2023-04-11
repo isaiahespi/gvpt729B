@@ -70,20 +70,22 @@ format.str <- "%a %b %d %H:%M:%S %z %Y"
 congress$date.rt <-as.POSIXct(strptime(congress[,8], format.str, tz = "GMT"), tz = "GMT")
 congress$date.t <-as.POSIXct(strptime(congress[,14], format.str, tz = "GMT"), tz = "GMT")
 
+# V = vertices of a graph
+# E = edges of a graph
+
 data<-cbind(c(congress[,3]),c(congress[,9]))
 net <- graph.empty()
 net <- add.vertices(net, length(unique(c(data))),name=as.character(unique(c(data))))
 net <- add.edges(net, t(data))
 E(net)$text <- congress$text
 E(net)$color <- "SkyBlue2"
-V(net)$eig<-evcent(net)$vector
-V(net)$ind<- degree(net,mode="in")
-V(net)$outd<- degree(net,mode="out")
+V(net)$eig <-evcent(net)$vector
+V(net)$ind <- degree(net,mode="in")
+V(net)$outd <- degree(net,mode="out")
 E(net)$color <- "gray"
 E(net)$friends <- congress$friends
 
 summary(net)
-
 
 ###
 ### Eliminate small communities
@@ -96,7 +98,13 @@ collect.nodes<- which(V(net)$membership==sel.com[1])
 for(i in 2:4){collect.nodes<- c(collect.nodes,which(V(net)$membership==sel.com[i]))}
 net <- induced.subgraph(graph=net,vids=collect.nodes)
 
+summary(net)
 
+# print the number of nodes
+vcount(net)
+
+# print the number of ties
+ecount(net)
 
 ##
 ## Estimate Layout
@@ -107,17 +115,56 @@ V(net)$l1<-l[,1]
 V(net)$l2<-l[,2]
 
 
-tiff(filename = paste("Basic.tiff",sep=""), width = 8, height = 8, units = "in", pointsize = 8, compression = c("lzw"),  bg = "white", res = 300)
-plot(l, col=V(net)$membership, cex=log(V(net)$ind)/3, pch=16, xlab="", ylab="", yaxt='n', xaxt='n')
-dev.off()
+tiff(
+  filename = paste("Basic.tiff", sep = ""),
+  width = 8,
+  height = 8,
+  units = "in",
+  pointsize = 8,
+  compression = c("lzw"),
+  bg = "white",
+  res = 300
+)
+
+plot(
+  l,
+  col = V(net)$membership,
+  cex = log(V(net)$ind) / 3,
+  pch = 16,
+  xlab = "",
+  ylab = "",
+  yaxt = 'n',
+  xaxt = 'n'
+)
+
+#dev.off()
 
 l2 <- layout_with_kk(net)
-tiff(filename = "Basic-kknet.tiff", width = 16, height = 16, units = "in", pointsize = 12, compression = c("lzw"), bg = "white", res = 300)
-plot(l2, col=V(net)$membership, cex=log(V(net)$ind)/3, pch=16, xlab="", ylab="", yaxt='n', xaxt='n')
+tiff(
+  filename = "Basic-kknet.tiff",
+  width = 16,
+  height = 16,
+  units = "in",
+  pointsize = 12,
+  compression = c("lzw"),
+  bg = "white",
+  res = 300
+)
+
+plot(
+  l2,
+  col = V(net)$membership,
+  cex = log(V(net)$ind) / 3,
+  pch = 16,
+  xlab = "",
+  ylab = "",
+  yaxt = 'n',
+  xaxt = 'n'
+)
+
 title("Twitter Network of Politicians, US", cex=1.6)
-dev.off()
 
-
+#dev.off()
 
 
 ###
